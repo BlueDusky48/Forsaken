@@ -1,0 +1,175 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+local UIS = game:GetService("UserInputService")
+
+local active = false
+local AIM_RADIUS = 100
+local predictionAmount = 4
+local usingAbility = false
+local mode = "Normal"
+local hpTargetMode = "Normal"
+local hpPriority = 50
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CharacterAimbotUI"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = PlayerGui
+
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 120, 0, 30)
+toggleButton.Position = UDim2.new(0, 10, 0, 50)
+toggleButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+toggleButton.TextColor3 = Color3.new(1, 1, 1)
+toggleButton.Text = "1x4 Aimbot: OFF"
+toggleButton.Parent = screenGui
+
+local hideButton = Instance.new("TextButton")
+hideButton.Size = UDim2.new(0, 30, 0, 30)
+hideButton.Position = UDim2.new(0, 130, 0, 50)
+hideButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+hideButton.TextColor3 = Color3.new(1, 1, 1)
+hideButton.Text = ">"
+hideButton.Parent = screenGui
+
+local radiusBox = Instance.new("TextBox")
+radiusBox.Size = UDim2.new(0, 120, 0, 30)
+radiusBox.Position = UDim2.new(0, 10, 0, 80)
+radiusBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+radiusBox.TextColor3 = Color3.new(1, 1, 1)
+radiusBox.Text = tostring(AIM_RADIUS)
+radiusBox.PlaceholderText = "Radius"
+radiusBox.ClearTextOnFocus = false
+radiusBox.Parent = screenGui
+
+local predictionBox = Instance.new("TextBox")
+predictionBox.Size = UDim2.new(0, 120, 0, 30)
+predictionBox.Position = UDim2.new(0, 10, 0, 110)
+predictionBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+predictionBox.TextColor3 = Color3.new(1, 1, 1)
+predictionBox.Text = tostring(predictionAmount)
+predictionBox.PlaceholderText = "Prediction"
+predictionBox.ClearTextOnFocus = false
+predictionBox.Parent = screenGui
+
+local modeButton = Instance.new("TextButton")
+modeButton.Size = UDim2.new(0, 120, 0, 30)
+modeButton.Position = UDim2.new(0, 10, 0, 140)
+modeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+modeButton.TextColor3 = Color3.new(1, 1, 1)
+modeButton.Text = "Mode: "..mode
+modeButton.Parent = screenGui
+
+local hpModeButton = Instance.new("TextButton")
+hpModeButton.Size = UDim2.new(0, 120, 0, 30)
+hpModeButton.Position = UDim2.new(0, 10, 0, 170)
+hpModeButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+hpModeButton.TextColor3 = Color3.new(1, 1, 1)
+hpModeButton.Text = "Target HP: "..hpTargetMode
+hpModeButton.Parent = screenGui
+
+local hpPriorityBox = Instance.new("TextBox")
+hpPriorityBox.Size = UDim2.new(0, 120, 0, 30)
+hpPriorityBox.Position = UDim2.new(0, 10, 0, 200)
+hpPriorityBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+hpPriorityBox.TextColor3 = Color3.new(1, 1, 1)
+hpPriorityBox.Text = tostring(hpPriority)
+hpPriorityBox.PlaceholderText = "HP Priority"
+hpPriorityBox.ClearTextOnFocus = false
+hpPriorityBox.Parent = screenGui
+
+toggleButton.MouseButton1Click:Connect(function()
+    active = not active
+    toggleButton.Text = active and "1x4 Aimbot: ON" or "1x4 Aimbot: OFF"
+    toggleButton.BackgroundColor3 = active and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(35, 35, 35)
+end)
+
+local guiVisible = true
+hideButton.MouseButton1Click:Connect(function()
+    guiVisible = not guiVisible
+    hideButton.Text = guiVisible and "<" or ">"
+    for _, obj in ipairs(screenGui:GetChildren()) do
+        if obj ~= toggleButton and obj ~= hideButton then
+            obj.Visible = guiVisible
+        end
+    end
+end)
+
+modeButton.MouseButton1Click:Connect(function()
+    mode = (mode == "Normal") and "Targeter" or "Normal"
+    modeButton.Text = "Mode: "..mode
+end)
+
+hpModeButton.MouseButton1Click:Connect(function()
+    hpTargetMode = (hpTargetMode == "Normal") and "Below" or "Normal"
+    hpModeButton.Text = "Target HP: "..hpTargetMode
+end)
+
+predictionBox.FocusLost:Connect(function()
+    local val = tonumber(predictionBox.Text)
+    if val then predictionAmount = val else predictionBox.Text = tostring(predictionAmount) end
+end)
+
+hpPriorityBox.FocusLost:Connect(function()
+    local val = tonumber(hpPriorityBox.Text)
+    if val then hpPriority = val else hpPriorityBox.Text = tostring(hpPriority) end
+end)
+
+radiusBox.FocusLost:Connect(function()
+    local val = tonumber(radiusBox.Text)
+    if val then AIM_RADIUS = val else radiusBox.Text = tostring(AIM_RADIUS) end
+end)
+
+local function getNearestTarget()
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
+    local nearest, shortestDist = nil, AIM_RADIUS
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") then
+            local humanoid = player.Character.Humanoid
+            if humanoid.Health > 0 then
+                if hpTargetMode == "Below" and humanoid.Health > hpPriority then
+                    continue
+                end
+                local dist = (char.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).Magnitude
+                if dist < shortestDist then
+                    shortestDist = dist
+                    nearest = player.Character
+                    if mode == "Targeter" then break end
+                end
+            end
+        end
+    end
+    return nearest
+end
+
+UIS.InputBegan:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.E then
+        usingAbility = "Entanglement"
+    elseif input.KeyCode == Enum.KeyCode.R then
+        usingAbility = "Mass Infection"
+    end
+end)
+
+UIS.InputEnded:Connect(function(input, gp)
+    if gp then return end
+    if input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.R then
+        usingAbility = false
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if not active or not usingAbility then return end
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    local target = getNearestTarget()
+    if target then
+        local root = char.HumanoidRootPart
+        local targetHRP = target.HumanoidRootPart
+        local predictedPos = targetHRP.Position + (targetHRP.Velocity * predictionAmount)
+        predictedPos = Vector3.new(predictedPos.X, root.Position.Y, predictedPos.Z)
+        root.CFrame = CFrame.new(root.Position, predictedPos)
+    end
+end)
